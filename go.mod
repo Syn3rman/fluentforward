@@ -1,4 +1,4 @@
-module fluentforward
+module Syn3rman/fluentforward
 
 go 1.14
 
