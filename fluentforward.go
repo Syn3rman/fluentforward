@@ -31,7 +31,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// ffSpan is serialized as a messagepack array of the form:
+// FFSpan is serialized as a messagepack array of the form:
 //
 // [
 // 	"tag",
@@ -39,7 +39,7 @@ import (
 // 	{"key": "value", ...}
 // ]
 
-type ffSpan struct {
+type FFSpan struct {
 	_msgpack struct{} `msgpack:",asArray"`
 	Tag      string   `msgpack:"tag"`
 	Ts       int64    `msgpack:"ts"`
@@ -171,7 +171,7 @@ func (e *Exporter) ExportSpans(ctx context.Context, sds []*export.SpanData) erro
 
 	for _, span := range sds {
 		var s struct{}
-		ffspan := ffSpan{
+		ffspan := FFSpan{
 			_msgpack: s,
 			Tag:      "span.test",
 			Ts:       span.EndTime.UnixNano(),
