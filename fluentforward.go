@@ -59,10 +59,10 @@ type SpanData struct {
 	EndTime                       int64                     `msgpack:"endTime"`                // End time of the span
 	Attrs                         map[label.Key]interface{} `msgpack:"attrs"`                  // A collection of key-value pairs
 	DroppedAttributeCount         int                       `msgpack:"droppedAttributesCount"` // Number of attributes that were dropped due to reasons like too many attributes
-	Links                         []Link                    `msgpack:"links"`
+	Links                         []Link                    `msgpack:"links,omitempty"`
 	DroppedLinkCount              int                       `msgpack:"droppedLinkCount"`
 	StatusCode                    string                    `msgpack:"statusCode"` // Status code of the span. Defaults to unset
-	MessageEvents                 []Event                   `msgpack:"messageEvents"`
+	MessageEvents                 []Event                   `msgpack:"messageEvents,omitempty"`
 	DroppedMessageEventCount      int                       `msgpack:"droppedMessageEventCount"`
 	SpanKind                      trace.SpanKind            `msgpack:"spanKind"`                   // Type of span
 	StatusMessage                 string                    `msgpack:"statusMessage"`              // Human readable error message
