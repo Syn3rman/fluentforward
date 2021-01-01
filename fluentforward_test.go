@@ -1,3 +1,16 @@
+// Copyright The OpenTelemetry Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package fluentforward
 
 import (
@@ -11,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.opentelemetry.io/otel/codes"
 	export "go.opentelemetry.io/otel/sdk/export/trace"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -26,7 +40,7 @@ func TestInstallNewPipeline(t *testing.T) {
 	instance := startMockFluentServer(t)
 	defer instance.Close()
 
-	err := InstallNewPipeline(url, serviceName)
+	err := InstallNewPipeline(url, serviceName, 10)
 	assert.NoError(t, err)
 }
 
@@ -71,6 +85,7 @@ func TestNewExportPipeline(t *testing.T) {
 			tp, err := NewExportPipeline(
 				url,
 				serviceName,
+				10,
 				tc.options...,
 			)
 			assert.NoError(t, err)
@@ -93,6 +108,7 @@ func TestNewRawExporter(t *testing.T) {
 	exp, err := NewRawExporter(
 		url,
 		serviceName,
+		10,
 	)
 
 	assert.NoError(t, err)
@@ -100,7 +116,7 @@ func TestNewRawExporter(t *testing.T) {
 }
 
 func TestNewRawExporterShouldFailInvalidURL(t *testing.T) {
-	exp, err := NewRawExporter("", serviceName)
+	exp, err := NewRawExporter("", serviceName, 0)
 	assert.Error(t, err)
 	assert.EqualError(t, err, "fluent instance url cannot be empty")
 	assert.Nil(t, exp)
@@ -127,7 +143,7 @@ func TestExportSpans(t *testing.T) {
 		},
 	}
 
-	exp, err := NewRawExporter(url, serviceName)
+	exp, err := NewRawExporter(url, serviceName, 0)
 	assert.NoError(t, err)
 	ctx := context.Background()
 

@@ -92,7 +92,7 @@ func TestNewResolvedTCPConn(t *testing.T) {
 		Return(clientConn, nil).
 		Once()
 
-	conn, err := newReconnectingTCPConn(url, time.Hour, resolver.ResolveTCPAddr, dialer.DialTCP)
+	conn, err := newReconnectingTCPConn(url, time.Hour, resolver.ResolveTCPAddr, dialer.DialTCP, nil)
 	assert.NoError(t, err)
 	require.NotNil(t, conn)
 
