@@ -16,15 +16,19 @@ package fluentforward
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 type reconnectingTCPConn struct {
 	ffurl       string
+	bufferBytes int64
 	resolveFunc resolveFunc
 	dialFunc    dialFunc
+	logger      *log.Logger
 
 	connMtx   sync.RWMutex
 	conn      *net.TCPConn
@@ -35,15 +39,18 @@ type reconnectingTCPConn struct {
 type resolveFunc func(network string, ffurl string) (*net.TCPAddr, error)
 type dialFunc func(network string, laddr, raddr *net.TCPAddr) (*net.TCPConn, error)
 
-func newReconnectingTCPConn(ffurl string, resolveTimeout time.Duration, resolveFunc resolveFunc, dialFunc dialFunc) (*reconnectingTCPConn, error) {
+func newReconnectingTCPConn(ffurl string, resolveTimeout time.Duration, resolveFunc resolveFunc, dialFunc dialFunc, logger *log.Logger) (*reconnectingTCPConn, error) {
 	conn := &reconnectingTCPConn{
 		ffurl:       ffurl,
 		resolveFunc: resolveFunc,
 		dialFunc:    dialFunc,
+		logger:      logger,
 		closeChan:   make(chan struct{}),
 	}
 	if err := conn.attemptResolveAndDial(); err != nil {
-		fmt.Printf("failed resolving destination address on connection startup, with err: %q. retrying in %s", err.Error(), resolveTimeout)
+		if conn.logger != nil {
+			conn.logger.Printf("failed resolving destination address on connection startup, with err: %q. retrying in %s", err.Error(), resolveTimeout)
+		}
 	}
 	go conn.reconnectLoop(resolveTimeout)
 
@@ -60,7 +67,9 @@ func (c *reconnectingTCPConn) reconnectLoop(resolveTimeout time.Duration) {
 			return
 		case <-ticker.C:
 			if err := c.attemptResolveAndDial(); err != nil {
-				fmt.Errorf("%s", err.Error())
+				if c.logger != nil {
+					c.logger.Printf("Error connecting to fluent service: %s", err.Error())
+				}
 			}
 		}
 	}
@@ -143,4 +152,24 @@ func (c *reconnectingTCPConn) Close() error {
 	}
 
 	return nil
+}
+
+// SetWriteBuffer defers to the net.tcpConn SetWriteBuffer implementation wrapped with a RLock. if no conn is currently held
+// and SetWriteBuffer is called store bufferBytes to be set for new conns
+func (c *reconnectingTCPConn) SetWriteBuffer(bytes int) error {
+	var err error
+
+	c.connMtx.RLock()
+	conn := c.conn
+	c.connMtx.RUnlock()
+
+	if conn != nil {
+		err = c.conn.SetWriteBuffer(bytes)
+	}
+
+	if err == nil {
+		atomic.StoreInt64(&c.bufferBytes, int64(bytes))
+	}
+
+	return err
 }

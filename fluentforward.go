@@ -31,7 +31,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// FFSpan is serialized as a messagepack array of the form:
+// ffSpan is serialized as a messagepack array of the form:
 //
 // [
 // 	"tag",
@@ -39,7 +39,7 @@ import (
 // 	{"key": "value", ...}
 // ]
 
-type FFSpan struct {
+type ffSpan struct {
 	_msgpack struct{} `msgpack:",asArray"`
 	Tag      string   `msgpack:"tag"`
 	Ts       int64    `msgpack:"ts"`
@@ -68,7 +68,7 @@ type SpanData struct {
 	StatusMessage                 string                    `msgpack:"statusMessage"`              // Human readable error message
 	InstrumentationLibraryName    string                    `msgpack:"instrumentationLibraryName"` // Instrumentation library used to provide instrumentation
 	InstrumentationLibraryVersion string                    `msgpack:"instrumentationLibraryVersion"`
-	Resource                      string                    `msgpack:"resource"` // Contains attributes representing an entity that produced this span
+	Resource                      string                    `msgpack:"resource,omitempty"` // Contains attributes representing an entity that produced this span
 }
 
 // An event is a time-stamped annotation of the span that has user supplied text description and key-value pairs
@@ -89,8 +89,14 @@ type Link struct {
 type Exporter struct {
 	url         string
 	serviceName string
-	client      *reconnectingTCPConn
+	client      tcpConn
 	o           options
+}
+
+type tcpConn interface {
+	Write([]byte) (int, error)
+	SetWriteBuffer(int) error
+	Close() error
 }
 
 // Option defines a function that configures the exporter.
@@ -118,8 +124,8 @@ func WithSDK(config *sdktrace.Config) Option {
 
 // InstallNewPipeline instantiates a NewExportPipeline with the
 // recommended configuration and registers it globally.
-func InstallNewPipeline(ffurl, serviceName string, opts ...Option) error {
-	tp, err := NewExportPipeline(ffurl, serviceName, opts...)
+func InstallNewPipeline(ffurl, serviceName string, timeout int, opts ...Option) error {
+	tp, err := NewExportPipeline(ffurl, serviceName, timeout, opts...)
 	if err != nil {
 		return err
 	}
@@ -129,8 +135,8 @@ func InstallNewPipeline(ffurl, serviceName string, opts ...Option) error {
 
 // NewExportPipeline sets up a complete export pipeline
 // with the recommended setup for trace provider
-func NewExportPipeline(ffurl, serviceName string, opts ...Option) (*sdktrace.TracerProvider, error) {
-	exp, err := NewRawExporter(ffurl, serviceName, opts...)
+func NewExportPipeline(ffurl, serviceName string, timeout int, opts ...Option) (*sdktrace.TracerProvider, error) {
+	exp, err := NewRawExporter(ffurl, serviceName, timeout, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +148,7 @@ func NewExportPipeline(ffurl, serviceName string, opts ...Option) (*sdktrace.Tra
 }
 
 // NewRawExporter creates a new exporter
-func NewRawExporter(ffurl, serviceName string, opts ...Option) (*Exporter, error) {
+func NewRawExporter(ffurl, serviceName string, timeout int, opts ...Option) (*Exporter, error) {
 	o := options{}
 	for _, opt := range opts {
 		opt(&o)
@@ -152,9 +158,24 @@ func NewRawExporter(ffurl, serviceName string, opts ...Option) (*Exporter, error
 		return nil, errors.New("fluent instance url cannot be empty")
 	}
 
-	client, err := newReconnectingTCPConn(ffurl, 10*time.Second, net.ResolveTCPAddr, net.DialTCP)
-	if err != nil {
-		return nil, err
+	var client tcpConn
+	var err error
+	if timeout != 0 {
+		timeoutDuration := time.Duration(timeout) * time.Second
+		client, err = newReconnectingTCPConn(ffurl, timeoutDuration, net.ResolveTCPAddr, net.DialTCP, o.logger)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		destAddr, err := net.ResolveTCPAddr("tcp", ffurl)
+		if err != nil {
+			return nil, err
+		}
+
+		client, err = net.DialTCP(destAddr.Network(), nil, destAddr)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &Exporter{
@@ -171,7 +192,7 @@ func (e *Exporter) ExportSpans(ctx context.Context, sds []*export.SpanData) erro
 
 	for _, span := range sds {
 		var s struct{}
-		ffspan := FFSpan{
+		ffspan := ffSpan{
 			_msgpack: s,
 			Tag:      "span.test",
 			Ts:       span.EndTime.UnixNano(),
