@@ -224,6 +224,8 @@ func (e *Exporter) ExportSpans(ctx context.Context, sds []*export.SpanData) erro
 		ffspan.SpanData = spans
 
 		t, err := msgpack.Marshal(&ffspan)
+		fmt.Printf("%s", hex.Dump(t))
+
 		if err != nil {
 			return errors.New("unable to serialize span data")
 		}
