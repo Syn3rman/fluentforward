@@ -16,9 +16,9 @@ package fluentforward
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
-	"hex"
 	"log"
 	"net"
 	"time"
