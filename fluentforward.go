@@ -195,7 +195,7 @@ func (e *Exporter) ExportSpans(ctx context.Context, sds []*export.SpanData) erro
 		var s struct{}
 		ffspan := ffSpan{
 			_msgpack: s,
-			Tag:      "span.test",
+			Tag:      "data.span",
 			Ts:       span.EndTime.UnixNano(),
 		}
 
